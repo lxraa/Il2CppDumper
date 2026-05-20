@@ -144,9 +144,23 @@ namespace Il2CppDumper
                     //parent
                     if (typeDef.parentIndex >= 0)
                     {
-                        var parentType = il2Cpp.types[typeDef.parentIndex];
-                        var parentTypeRef = GetTypeReference(typeDefinition, parentType);
-                        typeDefinition.BaseType = parentTypeRef;
+                        // In v32+ metadata, typeDef.parentIndex for an enum points to its
+                        // underlying primitive type (e.g. System.Int32), not System.Enum.
+                        // Mono.Cecil's TypeDefinition.IsEnum checks BaseType.FullName == "System.Enum",
+                        // so writing the underlying primitive as BaseType would make Cecil treat the
+                        // dummy enum as a regular class. That breaks every custom attribute that takes
+                        // an enum-typed argument from this assembly (Cecil throws ArgumentException in
+                        // SignatureWriter.WriteCustomAttributeEnumValue).
+                        if (typeDef.IsEnum)
+                        {
+                            typeDefinition.BaseType = typeDefinition.Module.ImportReference(typeof(Enum));
+                        }
+                        else
+                        {
+                            var parentType = il2Cpp.types[typeDef.parentIndex];
+                            var parentTypeRef = GetTypeReference(typeDefinition, parentType);
+                            typeDefinition.BaseType = parentTypeRef;
+                        }
                     }
 
                     //interfaces
